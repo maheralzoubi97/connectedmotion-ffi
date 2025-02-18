@@ -106,3 +106,88 @@ target_link_libraries(OpenCV_ffi
     ${log-lib}
 )
 ```
+
+
+
+## setup for IOS
+This project integrates NCNN and OpenCV with Flutter for iOS platforms using ffi (Foreign Function Interface), enabling advanced image processing capabilities required for AI-powered vehicle inspection.
+
+1. Create a required Flutter plugin to install OpenCV and NCNN, as the plugin contains a podspec file.
+
+2. In the podspec file, input the following code:
+
+
+```swift
+#
+# To learn more about a Podspec see http://guides.cocoapods.org/syntax/podspec.html.
+# Run `pod lib lint ncnn_yolox_flutter.podspec` to validate before publishing.
+#
+Pod::Spec.new do |s|
+  s.name             = 'dartffiplugin'
+  s.version          = '0.0.1'
+  s.summary          = 'A new flutter plugin project.'
+  s.description      = <<-DESC
+  A new flutter plugin project.
+                         DESC
+  s.homepage         = 'https://github.com/AutomotionJo/dartFFIPlugin/'
+  s.license          = { :file => '../LICENSE' }
+  s.author           = { 'Your Company' => 'connectedmotion' }
+  s.source           = { :path => '.' }
+  s.source_files = 'Classes/**/*'
+  s.dependency 'Flutter'
+  s.dependency 'OpenCV', '4.3.0'
+  s.platform = :ios, '14'
+
+  s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES', 'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386 arm64' }
+  s.swift_version = '5.0'
+
+  ## If you do not need to download the ncnn library, remove it. 
+  ## From here
+   s.prepare_command = <<-CMD
+      rm -rf "ncnn.xcframework"
+      rm -rf "openmp.xcframework"
+      curl "https://github.com/KoheiKanagu/ncnn_yolox_flutter/releases/download/0.0.6/ncnn-ios-bitcode_xcframework.zip" -L -o "ncnn-ios-bitcode_xcframework.zip"
+      unzip "ncnn-ios-bitcode_xcframework.zip"
+      rm "ncnn-ios-bitcode_xcframework.zip"
+    CMD
+  ## Up to here
+
+  s.preserve_paths = 'ncnn.xcframework', 'openmp.xcframework'
+  s.xcconfig = { 
+    'OTHER_LDFLAGS' => '-framework ncnn -framework openmp',
+    'OTHER_CFLAGS' => '-DUSE_NCNN_SIMPLEOCV -DDART_FFI_PLUGIN_IOS',
+  }
+  s.ios.vendored_frameworks = 'ncnn.xcframework', 'openmp.xcframework'
+  s.library = 'c++'
+end
+```
+
+3. In the plugin directory (e.g., dartFFIPlugin/ios/dartffiplugin.podspec), run this command:
+```swift
+pod lib lint dartffiplugin.podspec --verbose
+```
+
+4. Navigate to the vehicle_inspection_dev directory inside the project, then run this code on iOS:
+```swift
+cd ios
+arch -x86_64 pod update
+pod install
+arch -x86_64 pod update
+```
+
+5. Install ffi: ^2.0.1 in the pubspec.yaml file.
+6. Please open this link to access the C++ file inside the project
+https://bensonthew.medium.com/failed-to-lookup-symbol-dlsym-rtld-default-xxxx-symbol-not-found-e40216370345
+
+
+
+## Note
+If you see this issue:
+
+Install the latest versions of OpenCV and NCNN from this link https://github.com/Tencent/ncnn/blob/master/README.md?plain=1
+
+After downloading, replace the existing files in the 'plugin/ios' directory with the new file.
+
+## Note
+To work in archive mode, navigate to Xcode build settings. Select 'All', then 'Deployment', and finally set 'Strip Style' to 'Non-Global Symbols'.
+
