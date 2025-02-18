@@ -1,15 +1,24 @@
-# connectedmotion_ffi
+# Vehicle Inspection App
 
-A new Flutter plugin project.
+## Description
+The Vehicle Inspection App leverages artificial intelligence to automatically detect vehicle damages and dents, streamlining the inspection process. This app simplifies vehicle assessments, providing accurate results and improving inspection efficiency.
 
-## Getting Started
+## Setup Instructions
+1. **Clean the project**: Run the following command to clean the project and remove any cached data:
+   ```bash
+   flutter clean
+   flutter pub get
 
-This project is a starting point for a Flutter
-[plug-in package](https://flutter.dev/developing-packages/),
-a specialized package that includes platform-specific implementation code for
-Android and/or iOS.
 
-For help getting started with Flutter development, view the
-[online documentation](https://flutter.dev/docs), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## setup for Android
+1. Add this in the android/app/build.gradle file under the appropriate section.
 
+```java
+buildTypes {
+        release {
+            // TODO: Add your own signing config for the release build.
+            // Signing with the debug keys for now, so `flutter run --release` works.
+            signingConfig signingConfigs.debug
+        }
+    }
+```
