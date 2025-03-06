@@ -2,10 +2,11 @@
 #define YOUR_HEADER_H
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
-void image_ffi(unsigned char *, unsigned int *);
+    void image_ffi(unsigned char *, unsigned int *);
 
 #ifdef __cplusplus
 }

@@ -31,13 +31,13 @@ Pod::Spec.new do |s|
   s.swift_version = '5.0'
 
   ## Download NCNN framework
-  s.prepare_command = <<-CMD
-      rm -rf "ncnn.xcframework"
-      rm -rf "openmp.xcframework"
-      curl "https://github.com/KoheiKanagu/ncnn_yolox_flutter/releases/download/0.0.6/ncnn-ios-bitcode_xcframework.zip" -L -o "ncnn-ios-bitcode_xcframework.zip"
-      unzip "ncnn-ios-bitcode_xcframework.zip"
-      rm "ncnn-ios-bitcode_xcframework.zip"
-  CMD
+  # s.prepare_command = <<-CMD
+  #     rm -rf "ncnn.xcframework"
+  #     rm -rf "openmp.xcframework"
+  #     curl "https://github.com/KoheiKanagu/ncnn_yolox_flutter/releases/download/0.0.6/ncnn-ios-bitcode_xcframework.zip" -L -o "ncnn-ios-bitcode_xcframework.zip"
+  #     unzip "ncnn-ios-bitcode_xcframework.zip"
+  #     rm "ncnn-ios-bitcode_xcframework.zip"
+  # CMD
 
   s.preserve_paths = 'ncnn.xcframework', 'openmp.xcframework'
   
