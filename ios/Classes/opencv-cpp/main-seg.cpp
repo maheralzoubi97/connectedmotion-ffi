@@ -1326,3 +1326,45 @@ extern "C" __attribute__((visibility("default"))) __attribute__((used)) void YUV
 
     encodeAndAllocateJPEG(resizedImage, resizedJpegBuf, resizedJpegSize);
 }
+
+void ConvertBGRA8888toBGR(const cv::Mat &bgraImage, cv::Mat &bgrImage)
+{
+    if (bgraImage.type() != CV_8UC4)
+    {
+        std::cerr << "Invalid input image format: Expected CV_8UC4 (BGRA8888)" << std::endl;
+        return;
+    }
+    cv::cvtColor(bgraImage, bgrImage, cv::COLOR_BGRA2BGR);
+}
+
+extern "C" __attribute__((visibility("default"))) __attribute__((used)) void bgra88882jpg(unsigned char *buf, int size, int width, int height, unsigned char **jpegBuf, int *jpegSize, unsigned char **resizedJpegBuf, int *resizedJpegSize, int newWidth, int newHeight)
+{
+    // Create an OpenCV mat that references the BGRA8888 data
+    cv::Mat bgraImage(height, width, CV_8UC4, buf);
+    cv::Mat bgrImage;
+
+    // Convert from BGRA8888 to BGR
+    ConvertBGRA8888toBGR(bgraImage, bgrImage);
+
+    // Encoding the original BGR image to JPEG
+    std::vector<unsigned char> jpegBuffer;
+    cv::imencode(".jpg", bgrImage, jpegBuffer);
+
+    // Allocate memory for the original JPEG buffer to be passed back
+    *jpegBuf = (unsigned char *)malloc(jpegBuffer.size());
+    memcpy(*jpegBuf, jpegBuffer.data(), jpegBuffer.size());
+    *jpegSize = static_cast<int>(jpegBuffer.size());
+
+    // Resize the BGR image
+    cv::Mat resizedBgrImage;
+    cv::resize(bgrImage, resizedBgrImage, cv::Size(newWidth, newHeight));
+
+    // Encoding the resized BGR image to JPEG
+    std::vector<unsigned char> resizedJpegBuffer;
+    cv::imencode(".jpg", resizedBgrImage, resizedJpegBuffer);
+
+    // Allocate memory for the resized JPEG buffer to be passed back
+    *resizedJpegBuf = (unsigned char *)malloc(resizedJpegBuffer.size());
+    memcpy(*resizedJpegBuf, resizedJpegBuffer.data(), resizedJpegBuffer.size());
+    *resizedJpegSize = static_cast<int>(resizedJpegBuffer.size());
+}
