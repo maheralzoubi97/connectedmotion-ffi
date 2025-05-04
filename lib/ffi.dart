@@ -222,3 +222,86 @@ void processImageInIsolate(SendPort mainSendPort) {
     }
   });
 }
+
+void convertBgra88882Jpg(Map<String, dynamic> data) {
+  final port = data['send_port'] as SendPort;
+  final cameraImage = data['cameraImage'] as CameraImage;
+  final index = data['index'];
+  final isolateTimeStamp = data['isolateTimeStamp'];
+  final newWidth = data['newWidth'] as int;
+  final newHeight = data['newHeight'] as int;
+
+  final s = cameraImage.planes[0].bytes.length;
+  final p = malloc.allocate<Uint8>(4 * cameraImage.height * cameraImage.width);
+  p.asTypedList(s).setRange(0, s, cameraImage.planes[0].bytes);
+  final segBoundary =
+      malloc.allocate<Int32>(cameraImage.height * cameraImage.width);
+  final segBoundarySize = malloc.allocate<Int32>(1);
+  final jpegBuf = malloc.allocate<Pointer<Uint8>>(1);
+  final jpegSize = malloc.allocate<Int32>(1);
+  final resizedJpegBuf = malloc.allocate<Pointer<Uint8>>(1);
+  final resizedJpegSize = malloc.allocate<Int32>(1);
+
+  // Lookup the FFI function for BGRA8888 image processing with resizing
+  final imageFfi = dylib.lookupFunction<
+      Void Function(
+        Pointer<Uint8>,
+        Int32,
+        Int32,
+        Int32,
+        Pointer<Pointer<Uint8>>,
+        Pointer<Int32>,
+        Pointer<Pointer<Uint8>>,
+        Pointer<Int32>,
+        Int32,
+        Int32,
+      ),
+      void Function(
+        Pointer<Uint8>,
+        int,
+        int,
+        int,
+        Pointer<Pointer<Uint8>>,
+        Pointer<Int32>,
+        Pointer<Pointer<Uint8>>,
+        Pointer<Int32>,
+        int,
+        int,
+      )>('bgra88882jpg');
+
+  try {
+    imageFfi(
+      p,
+      s,
+      cameraImage.width,
+      cameraImage.height,
+      jpegBuf,
+      jpegSize,
+      resizedJpegBuf,
+      resizedJpegSize,
+      newWidth,
+      newHeight,
+    );
+
+    final originalImageBytes = jpegBuf.value.asTypedList(jpegSize.value);
+    final resizedImageBytes =
+        resizedJpegBuf.value.asTypedList(resizedJpegSize.value);
+
+    port.send({
+      "index": index,
+      "isolateTimeStamp": isolateTimeStamp,
+      "originalImage": originalImageBytes,
+      "resizedImage": resizedImageBytes,
+    });
+  } finally {
+    malloc.free(p);
+    malloc.free(segBoundary);
+    malloc.free(segBoundarySize);
+    malloc.free(jpegBuf.value);
+    malloc.free(jpegBuf);
+    malloc.free(jpegSize);
+    malloc.free(resizedJpegBuf.value);
+    malloc.free(resizedJpegBuf);
+    malloc.free(resizedJpegSize);
+  }
+}
