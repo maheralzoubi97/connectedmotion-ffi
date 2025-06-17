@@ -21,6 +21,23 @@ extern "C" __attribute__((visibility("default"))) __attribute__((used))
 const char *
 blurImageYUV240(unsigned char *buf, int size, double threshold, unsigned char *yData, unsigned char *uData, unsigned char *vData, int width, int height, int uvRowStride, int uvPixelStride);
 extern "C" __attribute__((visibility("default"))) __attribute__((used)) void resizeImageYUV240(unsigned char *yData, unsigned char *uData, unsigned char *vData, int width, int height, int uvRowStride, int uvPixelStride, int newWidth, int newHeight, unsigned char **resizedRGBImageData, int *resizedRGBImageSize);
-extern "C" __attribute__((visibility("default"))) __attribute__((used)) void YUV2JPG(unsigned char *yData, unsigned char *uData, unsigned char *vData, int width, int height, int uvRowStride, int uvPixelStride, unsigned char **originalJpegBuf, int *originalJpegSize, unsigned char **resizedJpegBuf, int *resizedJpegSize, int newWidth, int newHeight);
+extern "C" __attribute__((visibility("default"))) __attribute__((used)) void YUV2JPG(
+    unsigned char *yData,
+    unsigned char *uData,
+    unsigned char *vData,
+    int width,
+    int height,
+    int uvRowStride,
+    int uvPixelStride,
+    unsigned char **originalJpegBuf,
+    int *originalJpegSize,
+    unsigned char **mediumJpegBuf,
+    int *mediumJpegSize,
+    unsigned char **lowJpegBuf,
+    int *lowJpegSize,
+    int newWidthMedium,
+    int newHeightMedium,
+    int newWidthLow,
+    int newHeightLow);
 
 #include "main-seg.cpp"

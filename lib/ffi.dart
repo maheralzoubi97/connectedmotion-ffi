@@ -7,20 +7,25 @@ import 'package:connectedmotion_ffi/functions/functions.dart';
 import 'package:ffi/ffi.dart';
 
 Map<String, Uint8List>? _processBgra8888Image(
-    CameraImage cameraImage, int newWidth, int newHeight) {
+  CameraImage cameraImage,
+  int newWidthMedium,
+  int newHeightMedium,
+  int newWidthLow,
+  int newHeightLow,
+) {
   final s = cameraImage.planes[0].bytes.length;
-  final p = malloc.allocate<Uint8>(4 * cameraImage.height * cameraImage.width);
+  final p = malloc.allocate<Uint8>(s);
   p.asTypedList(s).setRange(0, s, cameraImage.planes[0].bytes);
 
-  final segBoundary =
-      malloc.allocate<Int32>(cameraImage.height * cameraImage.width);
-  final segBoundarySize = malloc.allocate<Int32>(1);
+  // Allocate buffers and sizes for original, medium, and low JPEGs
   final jpegBuf = malloc.allocate<Pointer<Uint8>>(1);
   final jpegSize = malloc.allocate<Int32>(1);
-  final resizedJpegBuf = malloc.allocate<Pointer<Uint8>>(1);
-  final resizedJpegSize = malloc.allocate<Int32>(1);
+  final mediumJpegBuf = malloc.allocate<Pointer<Uint8>>(1);
+  final mediumJpegSize = malloc.allocate<Int32>(1);
+  final lowJpegBuf = malloc.allocate<Pointer<Uint8>>(1);
+  final lowJpegSize = malloc.allocate<Int32>(1);
 
-  // Lookup the FFI function for BGRA8888 image processing with resizing
+  // Lookup the updated FFI function
   final imageFfi = dylib.lookupFunction<
       Void Function(
         Pointer<Uint8>,
@@ -31,6 +36,10 @@ Map<String, Uint8List>? _processBgra8888Image(
         Pointer<Int32>,
         Pointer<Pointer<Uint8>>,
         Pointer<Int32>,
+        Pointer<Pointer<Uint8>>,
+        Pointer<Int32>,
+        Int32,
+        Int32,
         Int32,
         Int32,
       ),
@@ -43,6 +52,10 @@ Map<String, Uint8List>? _processBgra8888Image(
         Pointer<Int32>,
         Pointer<Pointer<Uint8>>,
         Pointer<Int32>,
+        Pointer<Pointer<Uint8>>,
+        Pointer<Int32>,
+        int,
+        int,
         int,
         int,
       )>('bgra88882jpg');
@@ -55,64 +68,88 @@ Map<String, Uint8List>? _processBgra8888Image(
       cameraImage.height,
       jpegBuf,
       jpegSize,
-      resizedJpegBuf,
-      resizedJpegSize,
-      newWidth,
-      newHeight,
+      mediumJpegBuf,
+      mediumJpegSize,
+      lowJpegBuf,
+      lowJpegSize,
+      newWidthMedium,
+      newHeightMedium,
+      newWidthLow,
+      newHeightLow,
     );
 
     final originalImageBytes = jpegBuf.value.asTypedList(jpegSize.value);
-    final resizedImageBytes =
-        resizedJpegBuf.value.asTypedList(resizedJpegSize.value);
+    final mediumImageBytes =
+        mediumJpegBuf.value.asTypedList(mediumJpegSize.value);
+    final lowImageBytes = lowJpegBuf.value.asTypedList(lowJpegSize.value);
+
     return {
       "originalImage": originalImageBytes,
-      "resizedImage": resizedImageBytes,
+      "mediumImage": mediumImageBytes,
+      "lowImage": lowImageBytes,
     };
   } finally {
     malloc.free(p);
-    malloc.free(segBoundary);
-    malloc.free(segBoundarySize);
     if (jpegBuf.value != nullptr) malloc.free(jpegBuf.value);
     malloc.free(jpegBuf);
     malloc.free(jpegSize);
-    if (resizedJpegBuf.value != nullptr) malloc.free(resizedJpegBuf.value);
-    malloc.free(resizedJpegBuf);
-    malloc.free(resizedJpegSize);
+    if (mediumJpegBuf.value != nullptr) malloc.free(mediumJpegBuf.value);
+    malloc.free(mediumJpegBuf);
+    malloc.free(mediumJpegSize);
+    if (lowJpegBuf.value != nullptr) malloc.free(lowJpegBuf.value);
+    malloc.free(lowJpegBuf);
+    malloc.free(lowJpegSize);
   }
 }
 
+// Native C function signature typedef (matches native exactly)
 typedef YUV2JPGFunction = Void Function(
-    Pointer<Uint8>,
-    Pointer<Uint8>,
-    Pointer<Uint8>,
-    Int32,
-    Int32,
-    Int32,
-    Int32,
-    Pointer<Pointer<Uint8>>,
-    Pointer<Int32>,
-    Pointer<Pointer<Uint8>>,
-    Pointer<Int32>,
-    Int32,
-    Int32);
+  Pointer<Uint8> yData,
+  Pointer<Uint8> uData,
+  Pointer<Uint8> vData,
+  Int32 width,
+  Int32 height,
+  Int32 uvRowStride,
+  Int32 uvPixelStride,
+  Pointer<Pointer<Uint8>> originalJpegBuf,
+  Pointer<Int32> originalJpegSize,
+  Pointer<Pointer<Uint8>> mediumJpegBuf,
+  Pointer<Int32> mediumJpegSize,
+  Pointer<Pointer<Uint8>> lowJpegBuf,
+  Pointer<Int32> lowJpegSize,
+  Int32 newWidthMedium,
+  Int32 newHeightMedium,
+  Int32 newWidthLow,
+  Int32 newHeightLow,
+);
 
+// Dart callable function typedef (must match param count & order)
 typedef YUV2JPG = void Function(
-    Pointer<Uint8>,
-    Pointer<Uint8>,
-    Pointer<Uint8>,
-    int,
-    int,
-    int,
-    int,
-    Pointer<Pointer<Uint8>>,
-    Pointer<Int32>,
-    Pointer<Pointer<Uint8>>,
-    Pointer<Int32>,
-    int,
-    int);
+  Pointer<Uint8> yData,
+  Pointer<Uint8> uData,
+  Pointer<Uint8> vData,
+  int width,
+  int height,
+  int uvRowStride,
+  int uvPixelStride,
+  Pointer<Pointer<Uint8>> originalJpegBuf,
+  Pointer<Int32> originalJpegSize,
+  Pointer<Pointer<Uint8>> mediumJpegBuf,
+  Pointer<Int32> mediumJpegSize,
+  Pointer<Pointer<Uint8>> lowJpegBuf,
+  Pointer<Int32> lowJpegSize,
+  int newWidthMedium,
+  int newHeightMedium,
+  int newWidthLow,
+  int newHeightLow,
+);
 
 Map<String, Uint8List>? _processYuv420Image(
-    CameraImage cameraImage, int newWidth, int newHeight) {
+    CameraImage cameraImage,
+    int newWidthMedium,
+    int newHeightMedium,
+    int newWidthLow,
+    int newHeightLow) {
   final yPlane = cameraImage.planes[0];
   final uPlane = cameraImage.planes[1];
   final vPlane = cameraImage.planes[2];
@@ -127,8 +164,10 @@ Map<String, Uint8List>? _processYuv420Image(
 
   final originalJpegBuf = malloc.allocate<Pointer<Uint8>>(1);
   final originalJpegSize = malloc.allocate<Int32>(1);
-  final resizedJpegBuf = malloc.allocate<Pointer<Uint8>>(1);
-  final resizedJpegSize = malloc.allocate<Int32>(1);
+  final mediumJpegBuf = malloc.allocate<Pointer<Uint8>>(1);
+  final mediumJpegSize = malloc.allocate<Int32>(1);
+  final lowJpegBuf = malloc.allocate<Pointer<Uint8>>(1);
+  final lowJpegSize = malloc.allocate<Int32>(1);
 
   final yuv2jpgFunc = dylib.lookupFunction<YUV2JPGFunction, YUV2JPG>('YUV2JPG');
 
@@ -143,20 +182,27 @@ Map<String, Uint8List>? _processYuv420Image(
       uPlane.bytesPerPixel ?? 1,
       originalJpegBuf,
       originalJpegSize,
-      resizedJpegBuf,
-      resizedJpegSize,
-      newWidth,
-      newHeight,
+      mediumJpegBuf,
+      mediumJpegSize,
+      lowJpegBuf,
+      lowJpegSize,
+      newWidthMedium,
+      newHeightMedium,
+      newWidthLow,
+      newHeightLow,
     );
 
     final originalImageBytes = Uint8List.fromList(
         originalJpegBuf.value.asTypedList(originalJpegSize.value));
-    final resizedImageBytes = Uint8List.fromList(
-        resizedJpegBuf.value.asTypedList(resizedJpegSize.value));
+    final mediumImageBytes = Uint8List.fromList(
+        mediumJpegBuf.value.asTypedList(mediumJpegSize.value));
+    final lowImageBytes =
+        Uint8List.fromList(lowJpegBuf.value.asTypedList(lowJpegSize.value));
 
     return {
       "originalImage": originalImageBytes,
-      "resizedImage": resizedImageBytes,
+      "mediumImage": mediumImageBytes,
+      "lowImage": lowImageBytes,
     };
   } finally {
     malloc.free(yData);
@@ -165,23 +211,27 @@ Map<String, Uint8List>? _processYuv420Image(
     if (originalJpegBuf.value != nullptr) malloc.free(originalJpegBuf.value);
     malloc.free(originalJpegBuf);
     malloc.free(originalJpegSize);
-    if (resizedJpegBuf.value != nullptr) malloc.free(resizedJpegBuf.value);
-    malloc.free(resizedJpegBuf);
-    malloc.free(resizedJpegSize);
+    if (mediumJpegBuf.value != nullptr) malloc.free(mediumJpegBuf.value);
+    malloc.free(mediumJpegBuf);
+    malloc.free(mediumJpegSize);
+    if (lowJpegBuf.value != nullptr) malloc.free(lowJpegBuf.value);
+    malloc.free(lowJpegBuf);
+    malloc.free(lowJpegSize);
   }
 }
 
 void processImageInIsolate(SendPort mainSendPort) {
   final receivePort = ReceivePort();
-  // Send the port to receive messages on
   mainSendPort.send(receivePort.sendPort);
 
   receivePort.listen((message) {
     if (message is Map<String, dynamic>) {
       final responsePort = message['responsePort'] as SendPort;
       final cameraImage = message['cameraImage'] as CameraImage;
-      final newWidth = message['newWidth'] as int;
-      final newHeight = message['newHeight'] as int;
+      final newWidthMedium = message['newWidthMedium'] as int;
+      final newHeightMedium = message['newHeightMedium'] as int;
+      final newWidthLow = message['newWidthLow'] as int;
+      final newHeightLow = message['newHeightLow'] as int;
       final isAndroid = message['isAndroid'] as bool;
 
       final stopwatch = Stopwatch()..start();
@@ -190,17 +240,30 @@ void processImageInIsolate(SendPort mainSendPort) {
 
         if (isAndroid) {
           // Process Android YUV image
-          result = _processYuv420Image(cameraImage, newWidth, newHeight);
+          result = _processYuv420Image(
+            cameraImage,
+            newWidthMedium,
+            newHeightMedium,
+            newWidthLow,
+            newHeightLow,
+          );
         } else {
           // Process iOS BGRA image
-          result = _processBgra8888Image(cameraImage, newWidth, newHeight);
+          result = _processBgra8888Image(
+            cameraImage,
+            newWidthMedium,
+            newHeightMedium,
+            newWidthLow,
+            newHeightLow,
+          );
         }
 
         if (result != null) {
           responsePort.send({
             'success': true,
             'originalImage': result['originalImage'],
-            'resizedImage': result['resizedImage'],
+            'mediumImage': result['mediumImage'],
+            'lowImage': result['lowImage'],
             'processingTimeMs': stopwatch.elapsedMilliseconds,
           });
         } else {

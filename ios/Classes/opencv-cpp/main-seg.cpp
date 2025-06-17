@@ -1313,18 +1313,35 @@ void encodeAndAllocateJPEG(const cv::Mat &image, unsigned char **jpegBuf, int *j
     *jpegSize = static_cast<int>(jpegBuffer.size());
 }
 
-extern "C" __attribute__((visibility("default"))) __attribute__((used)) void YUV2JPG(unsigned char *yData, unsigned char *uData, unsigned char *vData, int width, int height, int uvRowStride, int uvPixelStride, unsigned char **originalJpegBuf, int *originalJpegSize, unsigned char **resizedJpegBuf, int *resizedJpegSize, int newWidth, int newHeight)
+extern "C" __attribute__((visibility("default"))) __attribute__((used)) void YUV2JPG(unsigned char *yData, unsigned char *uData, unsigned char *vData,
+                                                                                     int width, int height,
+                                                                                     int uvRowStride, int uvPixelStride,
+                                                                                     unsigned char **originalJpegBuf, int *originalJpegSize,
+                                                                                     unsigned char **mediumJpegBuf, int *mediumJpegSize,
+                                                                                     unsigned char **lowJpegBuf, int *lowJpegSize,
+                                                                                     int newWidthMedium, int newHeightMedium,
+                                                                                     int newWidthLow, int newHeightLow)
 {
-
+    // Convert YUV420 to RGB
     cv::Mat rgbImage;
     convertYUV420ToRGB(width, height, yData, uData, vData, uvRowStride, uvPixelStride, rgbImage);
 
+    // Encode original image
     encodeAndAllocateJPEG(rgbImage, originalJpegBuf, originalJpegSize);
 
-    cv::Mat resizedImage;
-    cv::resize(rgbImage, resizedImage, cv::Size(newWidth, newHeight));
+    // Resize to medium
+    cv::Mat mediumImage;
+    cv::resize(rgbImage, mediumImage, cv::Size(newWidthMedium, newHeightMedium));
 
-    encodeAndAllocateJPEG(resizedImage, resizedJpegBuf, resizedJpegSize);
+    // Encode medium image
+    encodeAndAllocateJPEG(mediumImage, mediumJpegBuf, mediumJpegSize);
+
+    // Resize to low from medium
+    cv::Mat lowImage;
+    cv::resize(mediumImage, lowImage, cv::Size(newWidthLow, newHeightLow));
+
+    // Encode low image
+    encodeAndAllocateJPEG(lowImage, lowJpegBuf, lowJpegSize);
 }
 
 void ConvertBGRA8888toBGR(const cv::Mat &bgraImage, cv::Mat &bgrImage)
@@ -1337,7 +1354,13 @@ void ConvertBGRA8888toBGR(const cv::Mat &bgraImage, cv::Mat &bgrImage)
     cv::cvtColor(bgraImage, bgrImage, cv::COLOR_BGRA2BGR);
 }
 
-extern "C" __attribute__((visibility("default"))) __attribute__((used)) void bgra88882jpg(unsigned char *buf, int size, int width, int height, unsigned char **jpegBuf, int *jpegSize, unsigned char **resizedJpegBuf, int *resizedJpegSize, int newWidth, int newHeight)
+extern "C" __attribute__((visibility("default"))) __attribute__((used)) void bgra88882jpg(
+    unsigned char *buf, int size, int width, int height,
+    unsigned char **jpegBuf, int *jpegSize,
+    unsigned char **mediumJpegBuf, int *mediumJpegSize,
+    unsigned char **lowJpegBuf, int *lowJpegSize,
+    int newWidthMedium, int newHeightMedium,
+    int newWidthLow, int newHeightLow)
 {
     // Create an OpenCV mat that references the BGRA8888 data
     cv::Mat bgraImage(height, width, CV_8UC4, buf);
@@ -1355,16 +1378,29 @@ extern "C" __attribute__((visibility("default"))) __attribute__((used)) void bgr
     memcpy(*jpegBuf, jpegBuffer.data(), jpegBuffer.size());
     *jpegSize = static_cast<int>(jpegBuffer.size());
 
-    // Resize the BGR image
-    cv::Mat resizedBgrImage;
-    cv::resize(bgrImage, resizedBgrImage, cv::Size(newWidth, newHeight));
+    // Resize to medium size
+    cv::Mat mediumBgrImage;
+    cv::resize(bgrImage, mediumBgrImage, cv::Size(newWidthMedium, newHeightMedium));
 
-    // Encoding the resized BGR image to JPEG
-    std::vector<unsigned char> resizedJpegBuffer;
-    cv::imencode(".jpg", resizedBgrImage, resizedJpegBuffer);
+    // Encoding the medium BGR image to JPEG
+    std::vector<unsigned char> mediumJpegBuffer;
+    cv::imencode(".jpg", mediumBgrImage, mediumJpegBuffer);
 
-    // Allocate memory for the resized JPEG buffer to be passed back
-    *resizedJpegBuf = (unsigned char *)malloc(resizedJpegBuffer.size());
-    memcpy(*resizedJpegBuf, resizedJpegBuffer.data(), resizedJpegBuffer.size());
-    *resizedJpegSize = static_cast<int>(resizedJpegBuffer.size());
+    // Allocate memory for the medium JPEG buffer
+    *mediumJpegBuf = (unsigned char *)malloc(mediumJpegBuffer.size());
+    memcpy(*mediumJpegBuf, mediumJpegBuffer.data(), mediumJpegBuffer.size());
+    *mediumJpegSize = static_cast<int>(mediumJpegBuffer.size());
+
+    // Resize from medium to low size
+    cv::Mat lowBgrImage;
+    cv::resize(mediumBgrImage, lowBgrImage, cv::Size(newWidthLow, newHeightLow));
+
+    // Encoding the low BGR image to JPEG
+    std::vector<unsigned char> lowJpegBuffer;
+    cv::imencode(".jpg", lowBgrImage, lowJpegBuffer);
+
+    // Allocate memory for the low JPEG buffer
+    *lowJpegBuf = (unsigned char *)malloc(lowJpegBuffer.size());
+    memcpy(*lowJpegBuf, lowJpegBuffer.data(), lowJpegBuffer.size());
+    *lowJpegSize = static_cast<int>(lowJpegBuffer.size());
 }
