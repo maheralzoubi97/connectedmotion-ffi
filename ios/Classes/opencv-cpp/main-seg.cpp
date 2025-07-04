@@ -1323,11 +1323,11 @@ extern "C" __attribute__((visibility("default"))) __attribute__((used)) void YUV
     int newWidthMedium, int newHeightMedium,
     int newWidthLow, int newHeightLow)
 {
-    // Convert YUV420 to RGB
+
     cv::Mat rgbImage;
     convertYUV420ToRGB(width, height, yData, uData, vData, uvRowStride, uvPixelStride, rgbImage);
 
-       if (width > height)
+    if (width > height)
     {
         cv::rotate(rgbImage, rgbImage, cv::ROTATE_90_CLOCKWISE);
     }
