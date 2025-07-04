@@ -1313,18 +1313,24 @@ void encodeAndAllocateJPEG(const cv::Mat &image, unsigned char **jpegBuf, int *j
     *jpegSize = static_cast<int>(jpegBuffer.size());
 }
 
-extern "C" __attribute__((visibility("default"))) __attribute__((used)) void YUV2JPG(unsigned char *yData, unsigned char *uData, unsigned char *vData,
-                                                                                     int width, int height,
-                                                                                     int uvRowStride, int uvPixelStride,
-                                                                                     unsigned char **originalJpegBuf, int *originalJpegSize,
-                                                                                     unsigned char **mediumJpegBuf, int *mediumJpegSize,
-                                                                                     unsigned char **lowJpegBuf, int *lowJpegSize,
-                                                                                     int newWidthMedium, int newHeightMedium,
-                                                                                     int newWidthLow, int newHeightLow)
+extern "C" __attribute__((visibility("default"))) __attribute__((used)) void YUV2JPG(
+    unsigned char *yData, unsigned char *uData, unsigned char *vData,
+    int width, int height,
+    int uvRowStride, int uvPixelStride,
+    unsigned char **originalJpegBuf, int *originalJpegSize,
+    unsigned char **mediumJpegBuf, int *mediumJpegSize,
+    unsigned char **lowJpegBuf, int *lowJpegSize,
+    int newWidthMedium, int newHeightMedium,
+    int newWidthLow, int newHeightLow)
 {
     // Convert YUV420 to RGB
     cv::Mat rgbImage;
     convertYUV420ToRGB(width, height, yData, uData, vData, uvRowStride, uvPixelStride, rgbImage);
+
+       if (width > height)
+    {
+        cv::rotate(rgbImage, rgbImage, cv::ROTATE_90_CLOCKWISE);
+    }
 
     // Encode original image
     encodeAndAllocateJPEG(rgbImage, originalJpegBuf, originalJpegSize);
