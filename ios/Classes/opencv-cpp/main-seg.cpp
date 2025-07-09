@@ -1321,13 +1321,13 @@ extern "C" __attribute__((visibility("default"))) __attribute__((used)) void YUV
     unsigned char **mediumJpegBuf, int *mediumJpegSize,
     unsigned char **lowJpegBuf, int *lowJpegSize,
     int newWidthMedium, int newHeightMedium,
-    int newWidthLow, int newHeightLow)
+    int newWidthLow, int newHeightLow,
+    int isPortrait)
 {
-
     cv::Mat rgbImage;
     convertYUV420ToRGB(width, height, yData, uData, vData, uvRowStride, uvPixelStride, rgbImage);
 
-    if (width > height)
+    if (isPortrait)
     {
         cv::rotate(rgbImage, rgbImage, cv::ROTATE_90_CLOCKWISE);
     }

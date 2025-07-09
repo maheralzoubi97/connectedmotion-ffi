@@ -121,6 +121,7 @@ typedef YUV2JPGFunction = Void Function(
   Int32 newHeightMedium,
   Int32 newWidthLow,
   Int32 newHeightLow,
+  Int32 isPortrait, // 👈 added
 );
 
 // Dart callable function typedef (must match param count & order)
@@ -142,14 +143,17 @@ typedef YUV2JPG = void Function(
   int newHeightMedium,
   int newWidthLow,
   int newHeightLow,
+  int isPortrait,
 );
 
 Map<String, Uint8List>? _processYuv420Image(
-    CameraImage cameraImage,
-    int newWidthMedium,
-    int newHeightMedium,
-    int newWidthLow,
-    int newHeightLow) {
+  CameraImage cameraImage,
+  int newWidthMedium,
+  int newHeightMedium,
+  int newWidthLow,
+  int newHeightLow,
+  bool isPortrait,
+) {
   final yPlane = cameraImage.planes[0];
   final uPlane = cameraImage.planes[1];
   final vPlane = cameraImage.planes[2];
@@ -172,6 +176,8 @@ Map<String, Uint8List>? _processYuv420Image(
   final yuv2jpgFunc = dylib.lookupFunction<YUV2JPGFunction, YUV2JPG>('YUV2JPG');
 
   try {
+    final isPortraitInt = isPortrait ? 1 : 0;
+
     yuv2jpgFunc(
       yData,
       uData,
@@ -190,14 +196,18 @@ Map<String, Uint8List>? _processYuv420Image(
       newHeightMedium,
       newWidthLow,
       newHeightLow,
+      isPortraitInt, // 👈 pass it here
     );
 
     final originalImageBytes = Uint8List.fromList(
-        originalJpegBuf.value.asTypedList(originalJpegSize.value));
+      originalJpegBuf.value.asTypedList(originalJpegSize.value),
+    );
     final mediumImageBytes = Uint8List.fromList(
-        mediumJpegBuf.value.asTypedList(mediumJpegSize.value));
-    final lowImageBytes =
-        Uint8List.fromList(lowJpegBuf.value.asTypedList(lowJpegSize.value));
+      mediumJpegBuf.value.asTypedList(mediumJpegSize.value),
+    );
+    final lowImageBytes = Uint8List.fromList(
+      lowJpegBuf.value.asTypedList(lowJpegSize.value),
+    );
 
     return {
       "originalImage": originalImageBytes,
@@ -233,19 +243,20 @@ void processImageInIsolate(SendPort mainSendPort) {
       final newWidthLow = message['newWidthLow'] as int;
       final newHeightLow = message['newHeightLow'] as int;
       final isAndroid = message['isAndroid'] as bool;
+      final isPortrait = message['isPortrait'] as bool;
 
       final stopwatch = Stopwatch()..start();
       try {
         Map<String, Uint8List>? result;
 
         if (isAndroid) {
-          // Process Android YUV image
           result = _processYuv420Image(
             cameraImage,
             newWidthMedium,
             newHeightMedium,
             newWidthLow,
             newHeightLow,
+            isPortrait,
           );
         } else {
           // Process iOS BGRA image

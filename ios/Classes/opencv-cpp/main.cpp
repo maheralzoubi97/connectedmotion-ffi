@@ -38,6 +38,7 @@ extern "C" __attribute__((visibility("default"))) __attribute__((used)) void YUV
     int newWidthMedium,
     int newHeightMedium,
     int newWidthLow,
-    int newHeightLow);
+    int newHeightLow,
+    int isPortrait);
 
 #include "main-seg.cpp"
