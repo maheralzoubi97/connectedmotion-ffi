@@ -1366,7 +1366,8 @@ extern "C" __attribute__((visibility("default"))) __attribute__((used)) void bgr
     unsigned char **mediumJpegBuf, int *mediumJpegSize,
     unsigned char **lowJpegBuf, int *lowJpegSize,
     int newWidthMedium, int newHeightMedium,
-    int newWidthLow, int newHeightLow)
+    int newWidthLow, int newHeightLow,
+    int isPortrait)
 {
     // Create an OpenCV mat that references the BGRA8888 data
     cv::Mat bgraImage(height, width, CV_8UC4, buf);
@@ -1374,6 +1375,12 @@ extern "C" __attribute__((visibility("default"))) __attribute__((used)) void bgr
 
     // Convert from BGRA8888 to BGR
     ConvertBGRA8888toBGR(bgraImage, bgrImage);
+
+    // Apply portrait rotation if needed
+    if (isPortrait)
+    {
+        cv::rotate(bgrImage, bgrImage, cv::ROTATE_90_CLOCKWISE);
+    }
 
     // Encoding the original BGR image to JPEG
     std::vector<unsigned char> jpegBuffer;

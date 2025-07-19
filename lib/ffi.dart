@@ -7,25 +7,20 @@ import 'package:connectedmotion_ffi/functions/functions.dart';
 import 'package:ffi/ffi.dart';
 
 Map<String, Uint8List>? _processBgra8888Image(
-  CameraImage cameraImage,
-  int newWidthMedium,
-  int newHeightMedium,
-  int newWidthLow,
-  int newHeightLow,
-) {
+    CameraImage cameraImage, int newWidth, int newHeight) {
   final s = cameraImage.planes[0].bytes.length;
-  final p = malloc.allocate<Uint8>(s);
+  final p = malloc.allocate<Uint8>(4 * cameraImage.height * cameraImage.width);
   p.asTypedList(s).setRange(0, s, cameraImage.planes[0].bytes);
 
-  // Allocate buffers and sizes for original, medium, and low JPEGs
+  final segBoundary =
+      malloc.allocate<Int32>(cameraImage.height * cameraImage.width);
+  final segBoundarySize = malloc.allocate<Int32>(1);
   final jpegBuf = malloc.allocate<Pointer<Uint8>>(1);
   final jpegSize = malloc.allocate<Int32>(1);
-  final mediumJpegBuf = malloc.allocate<Pointer<Uint8>>(1);
-  final mediumJpegSize = malloc.allocate<Int32>(1);
-  final lowJpegBuf = malloc.allocate<Pointer<Uint8>>(1);
-  final lowJpegSize = malloc.allocate<Int32>(1);
+  final resizedJpegBuf = malloc.allocate<Pointer<Uint8>>(1);
+  final resizedJpegSize = malloc.allocate<Int32>(1);
 
-  // Lookup the updated FFI function
+  // Lookup the FFI function for BGRA8888 image processing with resizing
   final imageFfi = dylib.lookupFunction<
       Void Function(
         Pointer<Uint8>,
@@ -36,10 +31,6 @@ Map<String, Uint8List>? _processBgra8888Image(
         Pointer<Int32>,
         Pointer<Pointer<Uint8>>,
         Pointer<Int32>,
-        Pointer<Pointer<Uint8>>,
-        Pointer<Int32>,
-        Int32,
-        Int32,
         Int32,
         Int32,
       ),
@@ -52,10 +43,6 @@ Map<String, Uint8List>? _processBgra8888Image(
         Pointer<Int32>,
         Pointer<Pointer<Uint8>>,
         Pointer<Int32>,
-        Pointer<Pointer<Uint8>>,
-        Pointer<Int32>,
-        int,
-        int,
         int,
         int,
       )>('bgra88882jpg');
@@ -68,37 +55,29 @@ Map<String, Uint8List>? _processBgra8888Image(
       cameraImage.height,
       jpegBuf,
       jpegSize,
-      mediumJpegBuf,
-      mediumJpegSize,
-      lowJpegBuf,
-      lowJpegSize,
-      newWidthMedium,
-      newHeightMedium,
-      newWidthLow,
-      newHeightLow,
+      resizedJpegBuf,
+      resizedJpegSize,
+      newWidth,
+      newHeight,
     );
 
     final originalImageBytes = jpegBuf.value.asTypedList(jpegSize.value);
-    final mediumImageBytes =
-        mediumJpegBuf.value.asTypedList(mediumJpegSize.value);
-    final lowImageBytes = lowJpegBuf.value.asTypedList(lowJpegSize.value);
-
+    final resizedImageBytes =
+        resizedJpegBuf.value.asTypedList(resizedJpegSize.value);
     return {
       "originalImage": originalImageBytes,
-      "mediumImage": mediumImageBytes,
-      "lowImage": lowImageBytes,
+      "resizedImage": resizedImageBytes,
     };
   } finally {
     malloc.free(p);
+    malloc.free(segBoundary);
+    malloc.free(segBoundarySize);
     if (jpegBuf.value != nullptr) malloc.free(jpegBuf.value);
     malloc.free(jpegBuf);
     malloc.free(jpegSize);
-    if (mediumJpegBuf.value != nullptr) malloc.free(mediumJpegBuf.value);
-    malloc.free(mediumJpegBuf);
-    malloc.free(mediumJpegSize);
-    if (lowJpegBuf.value != nullptr) malloc.free(lowJpegBuf.value);
-    malloc.free(lowJpegBuf);
-    malloc.free(lowJpegSize);
+    if (resizedJpegBuf.value != nullptr) malloc.free(resizedJpegBuf.value);
+    malloc.free(resizedJpegBuf);
+    malloc.free(resizedJpegSize);
   }
 }
 
@@ -262,8 +241,6 @@ void processImageInIsolate(SendPort mainSendPort) {
           // Process iOS BGRA image
           result = _processBgra8888Image(
             cameraImage,
-            newWidthMedium,
-            newHeightMedium,
             newWidthLow,
             newHeightLow,
           );
