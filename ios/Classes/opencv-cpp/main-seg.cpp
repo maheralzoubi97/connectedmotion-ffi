@@ -1417,3 +1417,127 @@ extern "C" __attribute__((visibility("default"))) __attribute__((used)) void bgr
     memcpy(*lowJpegBuf, lowJpegBuffer.data(), lowJpegBuffer.size());
     *lowJpegSize = static_cast<int>(lowJpegBuffer.size());
 }
+
+extern "C" __attribute__((visibility("default"))) __attribute__((used)) int detectImageOrientation(int width, int height)
+{
+    if (width > height)
+    {
+        return 0; // LANDSCAPE
+    }
+    else if (height > width)
+    {
+        return 1; // PORTRAIT
+    }
+    else
+    {
+        return 2; // SQUARE
+    }
+}
+
+extern "C" __attribute__((visibility("default"))) __attribute__((used)) void resizeImageTo1920x1080WithAspectRatio(
+    unsigned char *imageBytes, int imageSize,
+    int orientation,
+    unsigned char **outputBuffer, int *outputSize)
+{
+    // Decode the image from bytes
+    std::vector<unsigned char> inputData(imageBytes, imageBytes + imageSize);
+    cv::Mat originalImage = cv::imdecode(inputData, cv::IMREAD_COLOR);
+
+    if (originalImage.empty())
+    {
+        *outputBuffer = nullptr;
+        *outputSize = 0;
+        return;
+    }
+
+    int targetWidth, targetHeight;
+
+    // Set target dimensions based on orientation
+    if (orientation == 1) // PORTRAIT
+    {
+        targetWidth = 1080;
+        targetHeight = 1920;
+    }
+    else // LANDSCAPE or SQUARE
+    {
+        targetWidth = 1920;
+        targetHeight = 1080;
+    }
+
+    double targetAspectRatio = (double)targetWidth / targetHeight;
+    double originalAspectRatio = (double)originalImage.cols / originalImage.rows;
+
+    cv::Mat resizedImage;
+
+    if (originalAspectRatio > targetAspectRatio)
+    {
+        // Image is wider, fit by height and crop width
+        int newHeight = targetHeight;
+        int newWidth = (int)((double)originalImage.cols * newHeight / originalImage.rows);
+
+        cv::resize(originalImage, resizedImage, cv::Size(newWidth, newHeight));
+
+        // Center crop to target width
+        int cropX = (newWidth - targetWidth) / 2;
+        cv::Rect cropRect(cropX, 0, targetWidth, targetHeight);
+        resizedImage = resizedImage(cropRect);
+    }
+    else
+    {
+        // Image is taller, fit by width and crop height
+        int newWidth = targetWidth;
+        int newHeight = (int)((double)originalImage.rows * newWidth / originalImage.cols);
+
+        cv::resize(originalImage, resizedImage, cv::Size(newWidth, newHeight));
+
+        // Center crop to target height
+        int cropY = (newHeight - targetHeight) / 2;
+        cv::Rect cropRect(0, cropY, targetWidth, targetHeight);
+        resizedImage = resizedImage(cropRect);
+    }
+
+    // Encode to JPEG with quality 90
+    std::vector<unsigned char> jpegBuffer;
+    std::vector<int> compressionParams = {cv::IMWRITE_JPEG_QUALITY, 90};
+    cv::imencode(".jpg", resizedImage, jpegBuffer, compressionParams);
+
+    // Allocate memory for output
+    *outputSize = jpegBuffer.size();
+    *outputBuffer = (unsigned char *)malloc(*outputSize);
+    memcpy(*outputBuffer, jpegBuffer.data(), *outputSize);
+}
+
+extern "C" __attribute__((visibility("default"))) __attribute__((used)) void processImageComplete(
+    unsigned char *imageBytes, int imageSize,
+    unsigned char **outputBuffer, int *outputSize,
+    int *detectedOrientation)
+{
+    // Decode the image from bytes to get dimensions
+    std::vector<unsigned char> inputData(imageBytes, imageBytes + imageSize);
+    cv::Mat originalImage = cv::imdecode(inputData, cv::IMREAD_COLOR);
+
+    if (originalImage.empty())
+    {
+        *outputBuffer = nullptr;
+        *outputSize = 0;
+        *detectedOrientation = 0; // LANDSCAPE
+        return;
+    }
+
+    // Detect orientation
+    *detectedOrientation = detectImageOrientation(originalImage.cols, originalImage.rows);
+
+    // Resize with aspect ratio
+    resizeImageTo1920x1080WithAspectRatio(
+        imageBytes, imageSize, *detectedOrientation,
+        outputBuffer, outputSize);
+}
+
+// Memory cleanup function
+extern "C" __attribute__((visibility("default"))) __attribute__((used)) void freeImageBuffer(unsigned char *buffer)
+{
+    if (buffer != nullptr)
+    {
+        free(buffer);
+    }
+}

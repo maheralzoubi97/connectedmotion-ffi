@@ -1,6 +1,7 @@
 import 'dart:ffi';
 import 'dart:isolate';
 import 'dart:typed_data';
+import 'package:image/image.dart' as img;
 
 import 'package:camera/camera.dart';
 import 'package:connectedmotion_ffi/functions/functions.dart';
@@ -354,5 +355,70 @@ void convertBgra88882Jpg(Map<String, dynamic> data) {
     malloc.free(resizedJpegBuf.value);
     malloc.free(resizedJpegBuf);
     malloc.free(resizedJpegSize);
+  }
+}
+
+typedef DetectImageOrientationC = Int32 Function(Int32 width, Int32 height);
+typedef DetectImageOrientationDart = int Function(int width, int height);
+
+// --- resizeImageTo1920x1080WithAspectRatio ---
+typedef ResizeImage1920x1080C = Void Function(
+  Pointer<Uint8> imageBytes,
+  Int32 imageSize,
+  Int32 orientation,
+  Pointer<Pointer<Uint8>> outputBuffer,
+  Pointer<Int32> outputSize,
+);
+typedef ResizeImage1920x1080Dart = void Function(
+  Pointer<Uint8> imageBytes,
+  int imageSize,
+  int orientation,
+  Pointer<Pointer<Uint8>> outputBuffer,
+  Pointer<Int32> outputSize,
+);
+
+// Lookups
+final detectImageOrientation =
+    dylib.lookupFunction<DetectImageOrientationC, DetectImageOrientationDart>(
+        'detectImageOrientation');
+
+final resizeImageTo1920x1080 =
+    dylib.lookupFunction<ResizeImage1920x1080C, ResizeImage1920x1080Dart>(
+        'resizeImageTo1920x1080WithAspectRatio');
+
+Uint8List resizeJpegTo1920x1080(Uint8List jpegBytes) {
+  final inputPointer = malloc.allocate<Uint8>(jpegBytes.length);
+  inputPointer.asTypedList(jpegBytes.length).setAll(0, jpegBytes);
+
+  final outputBufferPtr = malloc.allocate<Pointer<Uint8>>(1);
+  final outputSizePtr = malloc.allocate<Int32>(1);
+
+  // Get image dimensions
+  final decoded = img.decodeImage(jpegBytes);
+  if (decoded == null) {
+    malloc.free(inputPointer);
+    malloc.free(outputBufferPtr);
+    malloc.free(outputSizePtr);
+    throw Exception("Could not decode JPEG");
+  }
+
+  final orientation = detectImageOrientation(decoded.width, decoded.height);
+
+  try {
+    resizeImageTo1920x1080(
+      inputPointer,
+      jpegBytes.length,
+      orientation,
+      outputBufferPtr,
+      outputSizePtr,
+    );
+
+    final resized = outputBufferPtr.value.asTypedList(outputSizePtr.value);
+    return Uint8List.fromList(resized);
+  } finally {
+    malloc.free(inputPointer);
+    if (outputBufferPtr.value != nullptr) malloc.free(outputBufferPtr.value);
+    malloc.free(outputBufferPtr);
+    malloc.free(outputSizePtr);
   }
 }
