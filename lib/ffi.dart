@@ -1,7 +1,6 @@
 import 'dart:ffi';
 import 'dart:isolate';
 import 'dart:typed_data';
-import 'package:image/image.dart' as img;
 
 import 'package:camera/camera.dart';
 import 'package:connectedmotion_ffi/functions/functions.dart';
@@ -361,6 +360,20 @@ void convertBgra88882Jpg(Map<String, dynamic> data) {
 typedef DetectImageOrientationC = Int32 Function(Int32 width, Int32 height);
 typedef DetectImageOrientationDart = int Function(int width, int height);
 
+// Fast dimension extraction function
+typedef GetImageDimensionsC = Void Function(
+  Pointer<Uint8> imageBytes,
+  Int32 imageSize,
+  Pointer<Int32> width,
+  Pointer<Int32> height,
+);
+typedef GetImageDimensionsDart = void Function(
+  Pointer<Uint8> imageBytes,
+  int imageSize,
+  Pointer<Int32> width,
+  Pointer<Int32> height,
+);
+
 // --- resizeImageTo1920x1080WithAspectRatio ---
 typedef ResizeImage1920x1080C = Void Function(
   Pointer<Uint8> imageBytes,
@@ -382,29 +395,32 @@ final detectImageOrientation =
     dylib.lookupFunction<DetectImageOrientationC, DetectImageOrientationDart>(
         'detectImageOrientation');
 
+final getImageDimensions =
+    dylib.lookupFunction<GetImageDimensionsC, GetImageDimensionsDart>(
+        'getImageDimensions');
+
 final resizeImageTo1920x1080 =
     dylib.lookupFunction<ResizeImage1920x1080C, ResizeImage1920x1080Dart>(
         'resizeImageTo1920x1080WithAspectRatio');
 
+// Fast version - no Dart image decoding
 Uint8List resizeJpegTo1920x1080(Uint8List jpegBytes) {
   final inputPointer = malloc.allocate<Uint8>(jpegBytes.length);
   inputPointer.asTypedList(jpegBytes.length).setAll(0, jpegBytes);
 
   final outputBufferPtr = malloc.allocate<Pointer<Uint8>>(1);
   final outputSizePtr = malloc.allocate<Int32>(1);
-
-  // Get image dimensions
-  final decoded = img.decodeImage(jpegBytes);
-  if (decoded == null) {
-    malloc.free(inputPointer);
-    malloc.free(outputBufferPtr);
-    malloc.free(outputSizePtr);
-    throw Exception("Could not decode JPEG");
-  }
-
-  final orientation = detectImageOrientation(decoded.width, decoded.height);
+  final widthPtr = malloc.allocate<Int32>(1);
+  final heightPtr = malloc.allocate<Int32>(1);
 
   try {
+    // Fast dimension extraction in C++ (no full decode)
+    getImageDimensions(inputPointer, jpegBytes.length, widthPtr, heightPtr);
+
+    // Get orientation from dimensions
+    final orientation = detectImageOrientation(widthPtr.value, heightPtr.value);
+
+    // Resize image
     resizeImageTo1920x1080(
       inputPointer,
       jpegBytes.length,
@@ -417,6 +433,8 @@ Uint8List resizeJpegTo1920x1080(Uint8List jpegBytes) {
     return Uint8List.fromList(resized);
   } finally {
     malloc.free(inputPointer);
+    malloc.free(widthPtr);
+    malloc.free(heightPtr);
     if (outputBufferPtr.value != nullptr) malloc.free(outputBufferPtr.value);
     malloc.free(outputBufferPtr);
     malloc.free(outputSizePtr);

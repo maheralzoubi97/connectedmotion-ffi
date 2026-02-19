@@ -44,5 +44,8 @@ extern "C" __attribute__((visibility("default"))) __attribute__((used)) void pro
 extern "C" __attribute__((visibility("default"))) __attribute__((used)) int detectImageOrientation(int width, int height);
 
 extern "C" __attribute__((visibility("default"))) __attribute__((used)) void freeImageBuffer(unsigned char *buffer);
+extern "C" __attribute__((visibility("default"))) __attribute__((used)) void getImageDimensions(
+    unsigned char *imageBytes, int imageSize,
+    int *width, int *height);
 
 #include "main-seg.cpp"

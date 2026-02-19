@@ -1541,3 +1541,77 @@ extern "C" __attribute__((visibility("default"))) __attribute__((used)) void fre
         free(buffer);
     }
 }
+
+// Fast JPEG dimension extraction from header
+extern "C" __attribute__((visibility("default"))) __attribute__((used)) void getImageDimensions(
+    unsigned char *imageBytes, int imageSize,
+    int *width, int *height)
+{
+    *width = 0;
+    *height = 0;
+
+    if (imageSize < 10 || imageBytes == nullptr)
+    {
+        return;
+    }
+
+    // Check JPEG signature
+    if (imageBytes[0] != 0xFF || imageBytes[1] != 0xD8)
+    {
+        return; // Not a JPEG
+    }
+
+    int pos = 2;
+    while (pos < imageSize - 1)
+    {
+        // Find next marker
+        if (imageBytes[pos] != 0xFF)
+        {
+            pos++;
+            continue;
+        }
+
+        unsigned char marker = imageBytes[pos + 1];
+        pos += 2;
+
+        // Skip padding bytes
+        while (pos < imageSize && imageBytes[pos - 1] == 0xFF && imageBytes[pos] == 0xFF)
+        {
+            pos++;
+        }
+
+        if (pos >= imageSize - 2)
+            break;
+
+        // SOF0, SOF1, SOF2 markers contain image dimensions
+        if (marker == 0xC0 || marker == 0xC1 || marker == 0xC2)
+        {
+            if (pos + 6 < imageSize)
+            {
+                // Skip segment length (2 bytes) and precision (1 byte)
+                pos += 3;
+
+                // Read height (2 bytes, big endian)
+                *height = (imageBytes[pos] << 8) | imageBytes[pos + 1];
+                pos += 2;
+
+                // Read width (2 bytes, big endian)
+                *width = (imageBytes[pos] << 8) | imageBytes[pos + 1];
+
+                return; // Found dimensions
+            }
+            break;
+        }
+
+        // Skip segment data
+        if (pos + 1 < imageSize)
+        {
+            int segmentLength = (imageBytes[pos] << 8) | imageBytes[pos + 1];
+            pos += segmentLength;
+        }
+        else
+        {
+            break;
+        }
+    }
+}

@@ -15,7 +15,7 @@ dependencies:
   logger:
   camera:
   path_provider: ^2.0.9
-  image: ^4.1.7 # or the latest version
+  
 
 
 
