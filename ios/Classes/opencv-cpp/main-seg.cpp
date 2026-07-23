@@ -1361,7 +1361,7 @@ void ConvertBGRA8888toBGR(const cv::Mat &bgraImage, cv::Mat &bgrImage)
 }
 
 extern "C" __attribute__((visibility("default"))) __attribute__((used)) void bgra88882jpg(
-    unsigned char *buf, int size, int width, int height,
+    unsigned char *buf, int size, int width, int height, int bytesPerRow,
     unsigned char **jpegBuf, int *jpegSize,
     unsigned char **mediumJpegBuf, int *mediumJpegSize,
     unsigned char **lowJpegBuf, int *lowJpegSize,
@@ -1369,8 +1369,12 @@ extern "C" __attribute__((visibility("default"))) __attribute__((used)) void bgr
     int newWidthLow, int newHeightLow,
     int isPortrait)
 {
-    // Create an OpenCV mat that references the BGRA8888 data
-    cv::Mat bgraImage(height, width, CV_8UC4, buf);
+    // Create an OpenCV mat that references the BGRA8888 data, using the real
+    // row stride — iOS camera buffers are frequently padded for alignment,
+    // so bytesPerRow can exceed width * 4. Assuming a tightly-packed stride
+    // here reads every row from the wrong offset, skewing the image more
+    // with each row down the frame.
+    cv::Mat bgraImage(height, width, CV_8UC4, buf, bytesPerRow);
     cv::Mat bgrImage;
 
     // Convert from BGRA8888 to BGR

@@ -32,7 +32,7 @@ extern "C" __attribute__((visibility("default"))) __attribute__((used)) void YUV
     int isPortrait);
 
 extern "C" __attribute__((visibility("default"))) __attribute__((used)) void bgra88882jpg(
-    unsigned char *buf, int size, int width, int height,
+    unsigned char *buf, int size, int width, int height, int bytesPerRow,
     unsigned char **jpegBuf, int *jpegSize,
     unsigned char **mediumJpegBuf, int *mediumJpegSize,
     unsigned char **lowJpegBuf, int *lowJpegSize,
