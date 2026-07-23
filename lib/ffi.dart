@@ -4,7 +4,10 @@ import 'dart:typed_data';
 
 import 'package:camera/camera.dart';
 import 'package:connectedmotion_ffi/functions/functions.dart';
+import 'package:connectedmotion_ffi/isolate_messages.dart';
 import 'package:ffi/ffi.dart';
+
+export 'package:connectedmotion_ffi/isolate_messages.dart';
 
 // Native C function signature for bgra88882jpg (must match main-seg.cpp exactly)
 typedef _Bgra88882JpgC = Void Function(
@@ -249,62 +252,52 @@ void processImageInIsolate(SendPort mainSendPort) {
   mainSendPort.send(receivePort.sendPort);
 
   receivePort.listen((message) {
-    if (message is Map<String, dynamic>) {
-      final responsePort = message['responsePort'] as SendPort;
-      final cameraImage = message['cameraImage'] as CameraImage;
-      final newWidthMedium = message['newWidthMedium'] as int;
-      final newHeightMedium = message['newHeightMedium'] as int;
-      final newWidthLow = message['newWidthLow'] as int;
-      final newHeightLow = message['newHeightLow'] as int;
-      final isAndroid = message['isAndroid'] as bool;
-      final isPortrait = message['isPortrait'] as bool;
-
+    if (message is CameraFrameRequest) {
+      final responsePort = message.responsePort;
       final stopwatch = Stopwatch()..start();
       try {
+        final cameraImage = message.materializeCameraImage();
         Map<String, Uint8List>? result;
 
-        if (isAndroid) {
+        if (message.isAndroid) {
           result = _processYuv420Image(
             cameraImage,
-            newWidthMedium,
-            newHeightMedium,
-            newWidthLow,
-            newHeightLow,
-            isPortrait,
+            message.newWidthMedium,
+            message.newHeightMedium,
+            message.newWidthLow,
+            message.newHeightLow,
+            message.isPortrait,
           );
         } else {
           // Process iOS BGRA image
           result = _processBgra8888Image(
             cameraImage,
-            newWidthMedium,
-            newHeightMedium,
-            newWidthLow,
-            newHeightLow,
-            isPortrait,
+            message.newWidthMedium,
+            message.newHeightMedium,
+            message.newWidthLow,
+            message.newHeightLow,
+            message.isPortrait,
           );
         }
 
         if (result != null) {
-          responsePort.send({
-            'success': true,
-            'originalImage': result['originalImage'],
-            'mediumImage': result['mediumImage'],
-            'lowImage': result['lowImage'],
-            'processingTimeMs': stopwatch.elapsedMilliseconds,
-          });
+          responsePort.send(CameraFrameResponse.success(
+            originalImage: result['originalImage'],
+            mediumImage: result['mediumImage'],
+            lowImage: result['lowImage'],
+            processingTimeMs: stopwatch.elapsedMilliseconds,
+          ));
         } else {
-          responsePort.send({
-            'success': false,
-            'error': 'Image processing failed',
-            'processingTimeMs': stopwatch.elapsedMilliseconds,
-          });
+          responsePort.send(CameraFrameResponse.failure(
+            error: 'Image processing failed',
+            processingTimeMs: stopwatch.elapsedMilliseconds,
+          ));
         }
       } catch (e) {
-        responsePort.send({
-          'success': false,
-          'error': e.toString(),
-          'processingTimeMs': stopwatch.elapsedMilliseconds,
-        });
+        responsePort.send(CameraFrameResponse.failure(
+          error: e.toString(),
+          processingTimeMs: stopwatch.elapsedMilliseconds,
+        ));
       } finally {
         stopwatch.stop();
       }
