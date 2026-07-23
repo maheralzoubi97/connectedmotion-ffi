@@ -6,46 +6,64 @@ import 'package:camera/camera.dart';
 import 'package:connectedmotion_ffi/functions/functions.dart';
 import 'package:ffi/ffi.dart';
 
+// Native C function signature for bgra88882jpg (must match main-seg.cpp exactly)
+typedef _Bgra88882JpgC = Void Function(
+  Pointer<Uint8> buf,
+  Int32 size,
+  Int32 width,
+  Int32 height,
+  Pointer<Pointer<Uint8>> originalJpegBuf,
+  Pointer<Int32> originalJpegSize,
+  Pointer<Pointer<Uint8>> mediumJpegBuf,
+  Pointer<Int32> mediumJpegSize,
+  Pointer<Pointer<Uint8>> lowJpegBuf,
+  Pointer<Int32> lowJpegSize,
+  Int32 newWidthMedium,
+  Int32 newHeightMedium,
+  Int32 newWidthLow,
+  Int32 newHeightLow,
+  Int32 isPortrait,
+);
+typedef _Bgra88882JpgDart = void Function(
+  Pointer<Uint8> buf,
+  int size,
+  int width,
+  int height,
+  Pointer<Pointer<Uint8>> originalJpegBuf,
+  Pointer<Int32> originalJpegSize,
+  Pointer<Pointer<Uint8>> mediumJpegBuf,
+  Pointer<Int32> mediumJpegSize,
+  Pointer<Pointer<Uint8>> lowJpegBuf,
+  Pointer<Int32> lowJpegSize,
+  int newWidthMedium,
+  int newHeightMedium,
+  int newWidthLow,
+  int newHeightLow,
+  int isPortrait,
+);
+
 Map<String, Uint8List>? _processBgra8888Image(
-    CameraImage cameraImage, int newWidth, int newHeight) {
+  CameraImage cameraImage,
+  int newWidthMedium,
+  int newHeightMedium,
+  int newWidthLow,
+  int newHeightLow,
+  bool isPortrait,
+) {
   final s = cameraImage.planes[0].bytes.length;
-  final p = malloc.allocate<Uint8>(4 * cameraImage.height * cameraImage.width);
-  p.asTypedList(s).setRange(0, s, cameraImage.planes[0].bytes);
+  // Allocate exactly s bytes — row stride may make s > width*4*height
+  final p = malloc.allocate<Uint8>(s);
+  p.asTypedList(s).setAll(0, cameraImage.planes[0].bytes);
 
-  final segBoundary =
-      malloc.allocate<Int32>(cameraImage.height * cameraImage.width);
-  final segBoundarySize = malloc.allocate<Int32>(1);
-  final jpegBuf = malloc.allocate<Pointer<Uint8>>(1);
-  final jpegSize = malloc.allocate<Int32>(1);
-  final resizedJpegBuf = malloc.allocate<Pointer<Uint8>>(1);
-  final resizedJpegSize = malloc.allocate<Int32>(1);
+  final originalJpegBuf = malloc.allocate<Pointer<Uint8>>(1);
+  final originalJpegSize = malloc.allocate<Int32>(1);
+  final mediumJpegBuf = malloc.allocate<Pointer<Uint8>>(1);
+  final mediumJpegSize = malloc.allocate<Int32>(1);
+  final lowJpegBuf = malloc.allocate<Pointer<Uint8>>(1);
+  final lowJpegSize = malloc.allocate<Int32>(1);
 
-  // Lookup the FFI function for BGRA8888 image processing with resizing
-  final imageFfi = dylib.lookupFunction<
-      Void Function(
-        Pointer<Uint8>,
-        Int32,
-        Int32,
-        Int32,
-        Pointer<Pointer<Uint8>>,
-        Pointer<Int32>,
-        Pointer<Pointer<Uint8>>,
-        Pointer<Int32>,
-        Int32,
-        Int32,
-      ),
-      void Function(
-        Pointer<Uint8>,
-        int,
-        int,
-        int,
-        Pointer<Pointer<Uint8>>,
-        Pointer<Int32>,
-        Pointer<Pointer<Uint8>>,
-        Pointer<Int32>,
-        int,
-        int,
-      )>('bgra88882jpg');
+  final imageFfi =
+      dylib.lookupFunction<_Bgra88882JpgC, _Bgra88882JpgDart>('bgra88882jpg');
 
   try {
     imageFfi(
@@ -53,31 +71,45 @@ Map<String, Uint8List>? _processBgra8888Image(
       s,
       cameraImage.width,
       cameraImage.height,
-      jpegBuf,
-      jpegSize,
-      resizedJpegBuf,
-      resizedJpegSize,
-      newWidth,
-      newHeight,
+      originalJpegBuf,
+      originalJpegSize,
+      mediumJpegBuf,
+      mediumJpegSize,
+      lowJpegBuf,
+      lowJpegSize,
+      newWidthMedium,
+      newHeightMedium,
+      newWidthLow,
+      newHeightLow,
+      isPortrait ? 1 : 0,
     );
 
-    final originalImageBytes = jpegBuf.value.asTypedList(jpegSize.value);
-    final resizedImageBytes =
-        resizedJpegBuf.value.asTypedList(resizedJpegSize.value);
+    final originalImageBytes = Uint8List.fromList(
+      originalJpegBuf.value.asTypedList(originalJpegSize.value),
+    );
+    final mediumImageBytes = Uint8List.fromList(
+      mediumJpegBuf.value.asTypedList(mediumJpegSize.value),
+    );
+    final lowImageBytes = Uint8List.fromList(
+      lowJpegBuf.value.asTypedList(lowJpegSize.value),
+    );
+
     return {
       "originalImage": originalImageBytes,
-      "resizedImage": resizedImageBytes,
+      "mediumImage": mediumImageBytes,
+      "lowImage": lowImageBytes,
     };
   } finally {
     malloc.free(p);
-    malloc.free(segBoundary);
-    malloc.free(segBoundarySize);
-    if (jpegBuf.value != nullptr) malloc.free(jpegBuf.value);
-    malloc.free(jpegBuf);
-    malloc.free(jpegSize);
-    if (resizedJpegBuf.value != nullptr) malloc.free(resizedJpegBuf.value);
-    malloc.free(resizedJpegBuf);
-    malloc.free(resizedJpegSize);
+    if (originalJpegBuf.value != nullptr) malloc.free(originalJpegBuf.value);
+    malloc.free(originalJpegBuf);
+    malloc.free(originalJpegSize);
+    if (mediumJpegBuf.value != nullptr) malloc.free(mediumJpegBuf.value);
+    malloc.free(mediumJpegBuf);
+    malloc.free(mediumJpegSize);
+    if (lowJpegBuf.value != nullptr) malloc.free(lowJpegBuf.value);
+    malloc.free(lowJpegBuf);
+    malloc.free(lowJpegSize);
   }
 }
 
@@ -241,8 +273,11 @@ void processImageInIsolate(SendPort mainSendPort) {
           // Process iOS BGRA image
           result = _processBgra8888Image(
             cameraImage,
+            newWidthMedium,
+            newHeightMedium,
             newWidthLow,
             newHeightLow,
+            isPortrait,
           );
         }
 
