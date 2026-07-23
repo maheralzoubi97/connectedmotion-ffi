@@ -1313,16 +1313,305 @@ void encodeAndAllocateJPEG(const cv::Mat &image, unsigned char **jpegBuf, int *j
     *jpegSize = static_cast<int>(jpegBuffer.size());
 }
 
-extern "C" __attribute__((visibility("default"))) __attribute__((used)) void YUV2JPG(unsigned char *yData, unsigned char *uData, unsigned char *vData, int width, int height, int uvRowStride, int uvPixelStride, unsigned char **originalJpegBuf, int *originalJpegSize, unsigned char **resizedJpegBuf, int *resizedJpegSize, int newWidth, int newHeight)
+extern "C" __attribute__((visibility("default"))) __attribute__((used)) void YUV2JPG(
+    unsigned char *yData, unsigned char *uData, unsigned char *vData,
+    int width, int height,
+    int uvRowStride, int uvPixelStride,
+    unsigned char **originalJpegBuf, int *originalJpegSize,
+    unsigned char **mediumJpegBuf, int *mediumJpegSize,
+    unsigned char **lowJpegBuf, int *lowJpegSize,
+    int newWidthMedium, int newHeightMedium,
+    int newWidthLow, int newHeightLow,
+    int isPortrait)
 {
-
     cv::Mat rgbImage;
     convertYUV420ToRGB(width, height, yData, uData, vData, uvRowStride, uvPixelStride, rgbImage);
 
+    if (isPortrait)
+    {
+        cv::rotate(rgbImage, rgbImage, cv::ROTATE_90_CLOCKWISE);
+    }
+
+    // Encode original image
     encodeAndAllocateJPEG(rgbImage, originalJpegBuf, originalJpegSize);
 
-    cv::Mat resizedImage;
-    cv::resize(rgbImage, resizedImage, cv::Size(newWidth, newHeight));
+    // Resize to medium
+    cv::Mat mediumImage;
+    cv::resize(rgbImage, mediumImage, cv::Size(newWidthMedium, newHeightMedium));
 
-    encodeAndAllocateJPEG(resizedImage, resizedJpegBuf, resizedJpegSize);
+    // Encode medium image
+    encodeAndAllocateJPEG(mediumImage, mediumJpegBuf, mediumJpegSize);
+
+    // Resize to low from medium
+    cv::Mat lowImage;
+    cv::resize(mediumImage, lowImage, cv::Size(newWidthLow, newHeightLow));
+
+    // Encode low image
+    encodeAndAllocateJPEG(lowImage, lowJpegBuf, lowJpegSize);
+}
+
+void ConvertBGRA8888toBGR(const cv::Mat &bgraImage, cv::Mat &bgrImage)
+{
+    if (bgraImage.type() != CV_8UC4)
+    {
+        std::cerr << "Invalid input image format: Expected CV_8UC4 (BGRA8888)" << std::endl;
+        return;
+    }
+    cv::cvtColor(bgraImage, bgrImage, cv::COLOR_BGRA2BGR);
+}
+
+extern "C" __attribute__((visibility("default"))) __attribute__((used)) void bgra88882jpg(
+    unsigned char *buf, int size, int width, int height,
+    unsigned char **jpegBuf, int *jpegSize,
+    unsigned char **mediumJpegBuf, int *mediumJpegSize,
+    unsigned char **lowJpegBuf, int *lowJpegSize,
+    int newWidthMedium, int newHeightMedium,
+    int newWidthLow, int newHeightLow,
+    int isPortrait)
+{
+    // Create an OpenCV mat that references the BGRA8888 data
+    cv::Mat bgraImage(height, width, CV_8UC4, buf);
+    cv::Mat bgrImage;
+
+    // Convert from BGRA8888 to BGR
+    ConvertBGRA8888toBGR(bgraImage, bgrImage);
+
+    // Apply portrait rotation if needed
+    if (isPortrait)
+    {
+        cv::rotate(bgrImage, bgrImage, cv::ROTATE_90_CLOCKWISE);
+    }
+
+    // Encoding the original BGR image to JPEG
+    std::vector<unsigned char> jpegBuffer;
+    cv::imencode(".jpg", bgrImage, jpegBuffer);
+
+    // Allocate memory for the original JPEG buffer to be passed back
+    *jpegBuf = (unsigned char *)malloc(jpegBuffer.size());
+    memcpy(*jpegBuf, jpegBuffer.data(), jpegBuffer.size());
+    *jpegSize = static_cast<int>(jpegBuffer.size());
+
+    // Resize to medium size
+    cv::Mat mediumBgrImage;
+    cv::resize(bgrImage, mediumBgrImage, cv::Size(newWidthMedium, newHeightMedium));
+
+    // Encoding the medium BGR image to JPEG
+    std::vector<unsigned char> mediumJpegBuffer;
+    cv::imencode(".jpg", mediumBgrImage, mediumJpegBuffer);
+
+    // Allocate memory for the medium JPEG buffer
+    *mediumJpegBuf = (unsigned char *)malloc(mediumJpegBuffer.size());
+    memcpy(*mediumJpegBuf, mediumJpegBuffer.data(), mediumJpegBuffer.size());
+    *mediumJpegSize = static_cast<int>(mediumJpegBuffer.size());
+
+    // Resize from medium to low size
+    cv::Mat lowBgrImage;
+    cv::resize(mediumBgrImage, lowBgrImage, cv::Size(newWidthLow, newHeightLow));
+
+    // Encoding the low BGR image to JPEG
+    std::vector<unsigned char> lowJpegBuffer;
+    cv::imencode(".jpg", lowBgrImage, lowJpegBuffer);
+
+    // Allocate memory for the low JPEG buffer
+    *lowJpegBuf = (unsigned char *)malloc(lowJpegBuffer.size());
+    memcpy(*lowJpegBuf, lowJpegBuffer.data(), lowJpegBuffer.size());
+    *lowJpegSize = static_cast<int>(lowJpegBuffer.size());
+}
+
+extern "C" __attribute__((visibility("default"))) __attribute__((used)) int detectImageOrientation(int width, int height)
+{
+    if (width > height)
+    {
+        return 0; // LANDSCAPE
+    }
+    else if (height > width)
+    {
+        return 1; // PORTRAIT
+    }
+    else
+    {
+        return 2; // SQUARE
+    }
+}
+
+extern "C" __attribute__((visibility("default"))) __attribute__((used)) void resizeImageTo1920x1080WithAspectRatio(
+    unsigned char *imageBytes, int imageSize,
+    int orientation,
+    unsigned char **outputBuffer, int *outputSize)
+{
+    // Decode the image from bytes
+    std::vector<unsigned char> inputData(imageBytes, imageBytes + imageSize);
+    cv::Mat originalImage = cv::imdecode(inputData, cv::IMREAD_COLOR);
+
+    if (originalImage.empty())
+    {
+        *outputBuffer = nullptr;
+        *outputSize = 0;
+        return;
+    }
+
+    int targetWidth, targetHeight;
+
+    // Set target dimensions based on orientation
+    if (orientation == 1) // PORTRAIT
+    {
+        targetWidth = 1080;
+        targetHeight = 1920;
+    }
+    else // LANDSCAPE or SQUARE
+    {
+        targetWidth = 1920;
+        targetHeight = 1080;
+    }
+
+    double targetAspectRatio = (double)targetWidth / targetHeight;
+    double originalAspectRatio = (double)originalImage.cols / originalImage.rows;
+
+    cv::Mat resizedImage;
+
+    if (originalAspectRatio > targetAspectRatio)
+    {
+        // Image is wider, fit by height and crop width
+        int newHeight = targetHeight;
+        int newWidth = (int)((double)originalImage.cols * newHeight / originalImage.rows);
+
+        cv::resize(originalImage, resizedImage, cv::Size(newWidth, newHeight));
+
+        // Center crop to target width
+        int cropX = (newWidth - targetWidth) / 2;
+        cv::Rect cropRect(cropX, 0, targetWidth, targetHeight);
+        resizedImage = resizedImage(cropRect);
+    }
+    else
+    {
+        // Image is taller, fit by width and crop height
+        int newWidth = targetWidth;
+        int newHeight = (int)((double)originalImage.rows * newWidth / originalImage.cols);
+
+        cv::resize(originalImage, resizedImage, cv::Size(newWidth, newHeight));
+
+        // Center crop to target height
+        int cropY = (newHeight - targetHeight) / 2;
+        cv::Rect cropRect(0, cropY, targetWidth, targetHeight);
+        resizedImage = resizedImage(cropRect);
+    }
+
+    // Encode to JPEG with quality 90
+    std::vector<unsigned char> jpegBuffer;
+    std::vector<int> compressionParams = {cv::IMWRITE_JPEG_QUALITY, 90};
+    cv::imencode(".jpg", resizedImage, jpegBuffer, compressionParams);
+
+    // Allocate memory for output
+    *outputSize = jpegBuffer.size();
+    *outputBuffer = (unsigned char *)malloc(*outputSize);
+    memcpy(*outputBuffer, jpegBuffer.data(), *outputSize);
+}
+
+extern "C" __attribute__((visibility("default"))) __attribute__((used)) void processImageComplete(
+    unsigned char *imageBytes, int imageSize,
+    unsigned char **outputBuffer, int *outputSize,
+    int *detectedOrientation)
+{
+    // Decode the image from bytes to get dimensions
+    std::vector<unsigned char> inputData(imageBytes, imageBytes + imageSize);
+    cv::Mat originalImage = cv::imdecode(inputData, cv::IMREAD_COLOR);
+
+    if (originalImage.empty())
+    {
+        *outputBuffer = nullptr;
+        *outputSize = 0;
+        *detectedOrientation = 0; // LANDSCAPE
+        return;
+    }
+
+    // Detect orientation
+    *detectedOrientation = detectImageOrientation(originalImage.cols, originalImage.rows);
+
+    // Resize with aspect ratio
+    resizeImageTo1920x1080WithAspectRatio(
+        imageBytes, imageSize, *detectedOrientation,
+        outputBuffer, outputSize);
+}
+
+// Memory cleanup function
+extern "C" __attribute__((visibility("default"))) __attribute__((used)) void freeImageBuffer(unsigned char *buffer)
+{
+    if (buffer != nullptr)
+    {
+        free(buffer);
+    }
+}
+
+// Fast JPEG dimension extraction from header
+extern "C" __attribute__((visibility("default"))) __attribute__((used)) void getImageDimensions(
+    unsigned char *imageBytes, int imageSize,
+    int *width, int *height)
+{
+    *width = 0;
+    *height = 0;
+
+    if (imageSize < 10 || imageBytes == nullptr)
+    {
+        return;
+    }
+
+    // Check JPEG signature
+    if (imageBytes[0] != 0xFF || imageBytes[1] != 0xD8)
+    {
+        return; // Not a JPEG
+    }
+
+    int pos = 2;
+    while (pos < imageSize - 1)
+    {
+        // Find next marker
+        if (imageBytes[pos] != 0xFF)
+        {
+            pos++;
+            continue;
+        }
+
+        unsigned char marker = imageBytes[pos + 1];
+        pos += 2;
+
+        // Skip padding bytes
+        while (pos < imageSize && imageBytes[pos - 1] == 0xFF && imageBytes[pos] == 0xFF)
+        {
+            pos++;
+        }
+
+        if (pos >= imageSize - 2)
+            break;
+
+        // SOF0, SOF1, SOF2 markers contain image dimensions
+        if (marker == 0xC0 || marker == 0xC1 || marker == 0xC2)
+        {
+            if (pos + 6 < imageSize)
+            {
+                // Skip segment length (2 bytes) and precision (1 byte)
+                pos += 3;
+
+                // Read height (2 bytes, big endian)
+                *height = (imageBytes[pos] << 8) | imageBytes[pos + 1];
+                pos += 2;
+
+                // Read width (2 bytes, big endian)
+                *width = (imageBytes[pos] << 8) | imageBytes[pos + 1];
+
+                return; // Found dimensions
+            }
+            break;
+        }
+
+        // Skip segment data
+        if (pos + 1 < imageSize)
+        {
+            int segmentLength = (imageBytes[pos] << 8) | imageBytes[pos + 1];
+            pos += segmentLength;
+        }
+        else
+        {
+            break;
+        }
+    }
 }

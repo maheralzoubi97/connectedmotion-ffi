@@ -12,28 +12,19 @@
 // CONDITIONS OF ANY KIND, either express or implied. See the License for the
 // specific language governing permissions and limitations under the License.
 
-#ifndef NCNN_BENCHMARK_H
-#define NCNN_BENCHMARK_H
-
-#include "layer.h"
-#include "mat.h"
-#include "platform.h"
+#ifndef NCNN_LAYER_TYPE_H
+#define NCNN_LAYER_TYPE_H
 
 namespace ncnn {
 
-// get now timestamp in ms
-NCNN_EXPORT double get_current_time();
-
-// sleep milliseconds
-NCNN_EXPORT void sleep(unsigned long long int milliseconds = 1000);
-
-#if NCNN_BENCHMARK
-
-NCNN_EXPORT void benchmark(const Layer* layer, double start, double end);
-NCNN_EXPORT void benchmark(const Layer* layer, const Mat& bottom_blob, Mat& top_blob, double start, double end);
-
-#endif // NCNN_BENCHMARK
+namespace LayerType {
+enum LayerType
+{
+#include "layer_type_enum.h"
+    CustomBit = (1 << 8),
+};
+} // namespace LayerType
 
 } // namespace ncnn
 
-#endif // NCNN_BENCHMARK_H
+#endif // NCNN_LAYER_TYPE_H

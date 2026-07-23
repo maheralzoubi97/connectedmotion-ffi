@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xcodebuild -workspace Runner.xcworkspace -scheme connectedmotion_ffi -sdk iphonesimulator -configuration Debug ARCHS=x86_64 ONLY_ACTIVE_ARCH=NO build)",
+      "Bash(nm /Users/maheralzoubi/Library/Developer/Xcode/DerivedData/Runner-cngufsorobteoudozvzvvowzwfpp/Build/Products/Debug-iphonesimulator/connectedmotion_ffi/libconnectedmotion_ffi.a)"
+    ]
+  }
+}

@@ -1,4 +1,6 @@
 PODS:
+  - camera_avfoundation (0.0.1):
+    - Flutter
   - "connectedmotion_ffi (0.0.1+1)":
     - Flutter
     - OpenCV (= 4.3.0)
@@ -6,29 +8,40 @@ PODS:
   - integration_test (0.0.1):
     - Flutter
   - OpenCV (4.3.0)
+  - path_provider_foundation (0.0.1):
+    - Flutter
+    - FlutterMacOS
 
 DEPENDENCIES:
+  - camera_avfoundation (from `.symlinks/plugins/camera_avfoundation/ios`)
   - connectedmotion_ffi (from `.symlinks/plugins/connectedmotion_ffi/ios`)
   - Flutter (from `Flutter`)
   - integration_test (from `.symlinks/plugins/integration_test/ios`)
+  - path_provider_foundation (from `.symlinks/plugins/path_provider_foundation/darwin`)
 
 SPEC REPOS:
   trunk:
     - OpenCV
 
 EXTERNAL SOURCES:
+  camera_avfoundation:
+    :path: ".symlinks/plugins/camera_avfoundation/ios"
   connectedmotion_ffi:
     :path: ".symlinks/plugins/connectedmotion_ffi/ios"
   Flutter:
     :path: Flutter
   integration_test:
     :path: ".symlinks/plugins/integration_test/ios"
+  path_provider_foundation:
+    :path: ".symlinks/plugins/path_provider_foundation/darwin"
 
 SPEC CHECKSUMS:
-  connectedmotion_ffi: 45f42f999e644bdaa30f2614ebb67332d739d5bb
-  Flutter: e0871f40cf51350855a761d2e70bf5af5b9b5de7
+  camera_avfoundation: dd002b0330f4981e1bbcb46ae9b62829237459a4
+  connectedmotion_ffi: 88cedfa9728403c8c4415f3114f380d4d3a2a3d4
+  Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
   integration_test: 252f60fa39af5e17c3aa9899d35d908a0721b573
   OpenCV: 681e0451c1e54c5930a8922277f817ed5d5ab459
+  path_provider_foundation: 2b6b4c569c0fb62ec74538f866245ac84301af46
 
 PODFILE CHECKSUM: f7f6d3c84da85494a07a2c89c0ca962b99ea1049
 
