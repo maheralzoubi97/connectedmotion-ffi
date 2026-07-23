@@ -31,6 +31,15 @@ extern "C" __attribute__((visibility("default"))) __attribute__((used)) void YUV
     int newHeightLow,
     int isPortrait);
 
+extern "C" __attribute__((visibility("default"))) __attribute__((used)) void bgra88882jpg(
+    unsigned char *buf, int size, int width, int height,
+    unsigned char **jpegBuf, int *jpegSize,
+    unsigned char **mediumJpegBuf, int *mediumJpegSize,
+    unsigned char **lowJpegBuf, int *lowJpegSize,
+    int newWidthMedium, int newHeightMedium,
+    int newWidthLow, int newHeightLow,
+    int isPortrait);
+
 extern "C" __attribute__((visibility("default"))) __attribute__((used)) void resizeImageTo1920x1080WithAspectRatio(
     unsigned char *imageBytes, int imageSize,
     int orientation,
@@ -47,5 +56,3 @@ extern "C" __attribute__((visibility("default"))) __attribute__((used)) void fre
 extern "C" __attribute__((visibility("default"))) __attribute__((used)) void getImageDimensions(
     unsigned char *imageBytes, int imageSize,
     int *width, int *height);
-
-#include "main-seg.cpp"
