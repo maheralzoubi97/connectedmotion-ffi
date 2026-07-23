@@ -33,8 +33,13 @@ set_target_properties(
 )
 
 # Define source files
+# main.cpp is declarations only; main-seg.cpp has the actual implementations
+# (previously pulled in via main.cpp's #include, which caused iOS to compile
+# every function twice — main-seg.cpp is now its own compilation unit here
+# too, matching how CocoaPods already compiles both files separately on iOS).
 set(SOURCES
     ../ios/Classes/opencv-cpp/main.cpp
+    ../ios/Classes/opencv-cpp/main-seg.cpp
 )
 
 # Find the log library
