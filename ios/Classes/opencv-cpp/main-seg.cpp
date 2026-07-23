@@ -1380,11 +1380,12 @@ extern "C" __attribute__((visibility("default"))) __attribute__((used)) void bgr
     // Convert from BGRA8888 to BGR
     ConvertBGRA8888toBGR(bgraImage, bgrImage);
 
-    // Apply portrait rotation if needed
-    if (isPortrait)
-    {
-        cv::rotate(bgrImage, bgrImage, cv::ROTATE_90_CLOCKWISE);
-    }
+    // No manual rotation here (unlike YUV2JPG/Android): camera_avfoundation's
+    // BGRA8888 image stream buffer already arrives in the device's current
+    // orientation, so rotating it again 90 degrees in either direction turns
+    // an already-correct frame sideways. isPortrait is accepted but unused
+    // for this path — kept for signature parity with the Android function.
+    (void)isPortrait;
 
     // Encoding the original BGR image to JPEG
     std::vector<unsigned char> jpegBuffer;
