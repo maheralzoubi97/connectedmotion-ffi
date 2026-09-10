@@ -993,7 +993,15 @@ extern "C" __attribute__((visibility("default"))) __attribute__((used)) void ima
 }
 
 // Convert YUV420 to RGB image
-void convertYUV420ToRGB(int width, int height, const uint8_t *yData, const uint8_t *uData, const uint8_t *vData, int uvRowStride, int uvPixelStride, cv::Mat &rgbImage)
+// yRowStride is the Y plane's real row stride, which on Android is padded to
+// the ISP's alignment and so is not always the frame width: a 1440-wide 4:3
+// frame comes back at 1472 on a 64-byte-aligned device, 1536 on a 128-byte
+// one, while the 1920-wide 16:9 frame this used to be given was already
+// 128-aligned and never padded. Indexing Y by width instead reads each row
+// that much early, shearing the frame further with every row down it — the
+// same hazard the BGRA path documents, where the preview looks perfect
+// because it is a separate surface and only the analysed frames are ruined.
+void convertYUV420ToRGB(int width, int height, const uint8_t *yData, const uint8_t *uData, const uint8_t *vData, int yRowStride, int uvRowStride, int uvPixelStride, cv::Mat &rgbImage)
 {
     rgbImage.create(height, width, CV_8UC3);
     for (int y = 0; y < height; y++)
@@ -1001,7 +1009,7 @@ void convertYUV420ToRGB(int width, int height, const uint8_t *yData, const uint8
         for (int x = 0; x < width; x++)
         {
             int uvIndex = uvPixelStride * (x / 2) + uvRowStride * (y / 2);
-            int yIndex = y * width + x;
+            int yIndex = y * yRowStride + x;
 
             int yp = yData[yIndex];
             int up = uData[uvIndex];
@@ -1023,7 +1031,9 @@ void convertYUV420ToRGB(int width, int height, const uint8_t *yData, const uint8
 extern "C" __attribute__((visibility("default"))) __attribute__((used)) void image_ffi_yuv24(unsigned char *yData, unsigned char *uData, unsigned char *vData, int width, int height, int uvRowStride, int uvPixelStride, int *segBoundary, int *segBoundarySize, unsigned char **jpegBuf, int *jpegSize)
 {
     cv::Mat rgbImage;
-    convertYUV420ToRGB(width, height, yData, uData, vData, uvRowStride, uvPixelStride, rgbImage);
+    // No Dart caller passes a Y stride here, so this keeps the tightly-packed
+    // assumption it has always had.
+    convertYUV420ToRGB(width, height, yData, uData, vData, width, uvRowStride, uvPixelStride, rgbImage);
 
     // Encoding the RGB image to JPEG
     std::vector<unsigned char> jpegBuffer;
@@ -1137,7 +1147,8 @@ const char *classifyImageYUV240(unsigned char *yData, unsigned char *uData, unsi
 
     // Convert YUV420 to RGB image
     cv::Mat rgbImage;
-    convertYUV420ToRGB(width, height, yData, uData, vData, uvRowStride, uvPixelStride, rgbImage);
+    // Unused from Dart, and no Y stride to pass: unchanged behaviour.
+    convertYUV420ToRGB(width, height, yData, uData, vData, width, uvRowStride, uvPixelStride, rgbImage);
 
     // cv::Mat resizedImage;
     // cv::resize(rgbImage, resizedImage, cv::Size(640, 640));
@@ -1191,7 +1202,8 @@ const char *blurImage(unsigned char *buf, int bufSize, double threshold, unsigne
     cv::Mat image;
 
     // Assuming convertYUV420ToRGB is defined elsewhere
-    convertYUV420ToRGB(width, height, buf, uData, vData, uvRowStride, uvPixelStride, image);
+    // Unused from Dart, and no Y stride to pass: unchanged behaviour.
+    convertYUV420ToRGB(width, height, buf, uData, vData, width, uvRowStride, uvPixelStride, image);
 
     if (image.empty())
     {
@@ -1231,7 +1243,8 @@ const char *blurImageYUV240(unsigned char *buf, int bufSize, double threshold, u
 {
     cv::Mat image;
 
-    convertYUV420ToRGB(width, height, buf, uData, vData, uvRowStride, uvPixelStride, image);
+    // Unused from Dart, and no Y stride to pass: unchanged behaviour.
+    convertYUV420ToRGB(width, height, buf, uData, vData, width, uvRowStride, uvPixelStride, image);
 
     if (image.empty())
     {
@@ -1287,7 +1300,8 @@ const char *blurPathImage(unsigned char *buf, int bufSize, double threshold)
 void resizeImageYUV240(unsigned char *yData, unsigned char *uData, unsigned char *vData, int width, int height, int uvRowStride, int uvPixelStride, int newWidth, int newHeight, unsigned char **resizedRGBImageData, int *resizedRGBImageSize)
 {
     cv::Mat rgbImage;
-    convertYUV420ToRGB(width, height, yData, uData, vData, uvRowStride, uvPixelStride, rgbImage);
+    // Unused from Dart, and no Y stride to pass: unchanged behaviour.
+    convertYUV420ToRGB(width, height, yData, uData, vData, width, uvRowStride, uvPixelStride, rgbImage);
 
     // Resize the RGB image
     cv::Mat resizedRGBImage;
@@ -1316,7 +1330,7 @@ void encodeAndAllocateJPEG(const cv::Mat &image, unsigned char **jpegBuf, int *j
 extern "C" __attribute__((visibility("default"))) __attribute__((used)) void YUV2JPG(
     unsigned char *yData, unsigned char *uData, unsigned char *vData,
     int width, int height,
-    int uvRowStride, int uvPixelStride,
+    int yRowStride, int uvRowStride, int uvPixelStride,
     unsigned char **originalJpegBuf, int *originalJpegSize,
     unsigned char **mediumJpegBuf, int *mediumJpegSize,
     unsigned char **lowJpegBuf, int *lowJpegSize,
@@ -1325,7 +1339,7 @@ extern "C" __attribute__((visibility("default"))) __attribute__((used)) void YUV
     int isPortrait)
 {
     cv::Mat rgbImage;
-    convertYUV420ToRGB(width, height, yData, uData, vData, uvRowStride, uvPixelStride, rgbImage);
+    convertYUV420ToRGB(width, height, yData, uData, vData, yRowStride, uvRowStride, uvPixelStride, rgbImage);
 
     if (isPortrait)
     {

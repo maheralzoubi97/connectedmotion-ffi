@@ -123,6 +123,7 @@ typedef YUV2JPGFunction = Void Function(
   Pointer<Uint8> vData,
   Int32 width,
   Int32 height,
+  Int32 yRowStride,
   Int32 uvRowStride,
   Int32 uvPixelStride,
   Pointer<Pointer<Uint8>> originalJpegBuf,
@@ -145,6 +146,7 @@ typedef YUV2JPG = void Function(
   Pointer<Uint8> vData,
   int width,
   int height,
+  int yRowStride,
   int uvRowStride,
   int uvPixelStride,
   Pointer<Pointer<Uint8>> originalJpegBuf,
@@ -198,6 +200,11 @@ Map<String, Uint8List>? _processYuv420Image(
       vData,
       cameraImage.width,
       cameraImage.height,
+      // The Y plane's real row stride, not the width. Android pads it to the
+      // ISP's alignment — a 1440-wide 4:3 frame arrives at 1472 or 1536 — and
+      // reading it as tightly packed shears the frame, which the preview never
+      // shows because it is a separate surface.
+      yPlane.bytesPerRow,
       uPlane.bytesPerRow,
       uPlane.bytesPerPixel ?? 1,
       originalJpegBuf,

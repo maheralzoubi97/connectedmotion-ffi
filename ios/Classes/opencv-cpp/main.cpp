@@ -17,6 +17,7 @@ extern "C" __attribute__((visibility("default"))) __attribute__((used)) void YUV
     unsigned char *vData,
     int width,
     int height,
+    int yRowStride,
     int uvRowStride,
     int uvPixelStride,
     unsigned char **originalJpegBuf,
